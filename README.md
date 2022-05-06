@@ -34,7 +34,7 @@ However, we can potentially esimate the runtime. [Dece AI.](https://deci.ai/blog
 Small dataset | 2,520  | 40 | 
 Full Res single GPU | 10,080 | **8*** | 
 Full Res multi GPU| 10,080 | 3 | 
-Full Res multi CPU| 10,080 | .03 | 
+Full Res CPU| 10,080 | .03 | 
 
 
 \* This is an estimate based on the runtime metrics above. 
