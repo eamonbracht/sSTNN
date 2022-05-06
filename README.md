@@ -15,19 +15,20 @@ The next approach was to implement a multi-gpu model at a much lower level using
 This lead to the final implementation which was to use PyTorch's built in device conversion method `.to(device)` to integrate hard-coded memory mangement directly into the runtime of the model. At a high level, this method requires a minimum of 2 GPUs (GPU A and B) and a host with sufficient memory to store the adjacency matrix. The model itself sits on GPU A and contains an encoder and decoder network. The adjacency matrix sits in host. Recall the adjacency matrix $W\in\mathbb{R}^{n\times n}$. However, many spatio-temporal patterns have mutliple relations, so $W\in\mathbb{R}^{r\times n \times n}$ where $r$ is the number of relations. When the model calls `get_relations()`, a subset $W' \in \mathbb{R}^{r^\prime \times n \times n}$ where $r^\prime \in [0, r]$ is transfered from host to GPU B where it is masked per a set of learned weights and then passed back to host. This is repeated $r\mod r^\prime$ times until the entire relational matrix is passed. This same procedure is done for the matrix multiplication steps as well. 
 
 ### Data
-In order to make the results of this work comparable, we choose to replicate the Pacific ocean temperature experiment in the Ziat et al. In that experiment, they resampled an area of the pacific ocean of size $60 \times 168$ pixels where each pixel represents $1 \times 1$ degrees down to a an area $30 \times 84$ with a pixel resolution of $2 \times 2$ degrees. 
+In order to make the results of this work comparable, we choose to replicate the Pacific ocean temperature experiment in the Ziat et al. In that experiment, they resampled an area of the pacific ocean of size $60 \times 168$ pixels where each pixel represents $1 \times 1$ degrees down to an area $30 \times 84$ with a pixel resolution of $2 \times 2$ degrees. 
 
 ![PST full area](figs/pst_full_area.png)
 ![PST patch area](figs/pst_patch.png)
 
 As a demonstration of the purpose of a multi-GPU model, we skipped the downsampling step, maintaining the original $60 \times 168$ pixel area. Although it is an area twice the size, it represents 4x as many pixels and requires an adjacency 16x as large. 
+
 ## Results 
 
 The full resolution dataset when passed into the model on a single V100 GPU with 16GB of memory overflowed.
 
-It is difficult to quantify the effeciency of this implementation because its runtime on a large dataset on a single GPU is intractable since it won't fit on GPU. As such, we can only concretely quantify its speed up coompared to doing all tensor operations on host. 
+It is difficult to quantify the effeciency of this implementation because its single GPU runtime on the larger dataset is intractable. As such, we can only concretely quantify its speed up coompared to doing all adjacency matrix tensor operations on host. 
 
-However, we can potentially esimate the runtime. [Dece AI.](https://deci.ai/blog/flops-vs-run-time-comparison/) examined runtime performance and effeciency for matrix * vector computation on GPU for various matrix size. They found that for a GPU, runtime increased by 5x for a matrix size increase from $2,500 \rightarrow 10,000$. We can use this to roughly upper-bound the theoretical runtime on a single GPU.
+However, we can potentially esimate the runtime. [Dece AI.](https://deci.ai/blog/flops-vs-run-time-comparison/) examined runtime performance and effeciency for matrix * vector computation on GPU for various matrix sizes. They found that runtime increased by 5x for a matrix size increase from $2,500 \rightarrow 10,000$. We can use this to roughly upper-bound the theoretical runtime of the large dataset on a single GPU.
 
 | Model | relation size | # batches/sec | 
 | --- | --- | -- | 
@@ -39,12 +40,12 @@ Full Res CPU| 10,080 | .03 |
 
 \* This is an estimate based on the runtime metrics above. 
 
-The above runtime estimates gives an very conservative upper-bound on theoretical optimal runtime performance of this model. STNNMg in its current implementation is slower by factor of 3 compared to a theoretical single GPU implementation but 100x faster than a CPU only implementation. The increase in data generated an overall 14x slowdown in performance and a 5x slowdown versus our theorized single GPU runtime. 
+The above runtime estimate gives an very conservative upper-bound on theoretical optimal runtime performance of this model. STNNMg in its current implementation is slower by factor of 3 compared to a theoretical single GPU implementation but 100x faster than a CPU implementation. The increase in data generated an overall 14x slowdown in performance and a 5x slowdown versus our theorized single GPU runtime. 
 
 The model ultimately achieved similar accuracies to the model in Ziat et al., due to the fact that the core architecture did not change. 
 
 ## Discussion
-While the results here are promising, there are many limitations. First, the model is limited to 2 GPU setup.. As such, a more robust framework should be built for spreading the adjacency computation over multiple GPUs instead of just spreading the model over mutliple GPUs as was done here. Furthermore, there are GPUs with larger memoery, A100s are available in 40 and 80GB versions. That being said, given the superlinear scaling of the memory requirements, a 2.5x increase in memory is unlikely to yeild a significantly larger trainable area. Finally, the adjacency matrix is very sparse and the optimal strategy would be to implement this using a sparse matrix representation. 
+While the results here are promising, there are many limitations. First, the model is limited to 2 GPU setup. As such, a more robust framework should be built for spreading the adjacency computation over multiple GPUs instead of just spreading the model over mutliple GPUs as was done here. Furthermore, there are GPUs with larger memoery, A100s are available in 40 and 80GB versions. That being said, given the superlinear scaling of the memory requirements, a 2.5x increase in memory is unlikely to yeild a significantly larger trainable area. Finally, the adjacency matrix is very sparse and the optimal strategy would be to implement this using a sparse matrix representation. 
 
 
 
